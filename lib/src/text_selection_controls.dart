@@ -212,7 +212,7 @@ class DefaultTextSelectionControls extends TextSelectionControls {
     this.handle = const CupertinoTextSelectionHandle(),
   }) : assert(handle != null);
 
-  DefaultTextSelectionControls.withDefaultHandle({
+  DefaultTextSelectionControls.withPlatformHandle({
     this.toolbar,
     BuildContext context,
   }) : handle = defaultHandle(context);
