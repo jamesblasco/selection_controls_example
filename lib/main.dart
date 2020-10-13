@@ -276,7 +276,72 @@ class _RichTextEditorState extends State<RichTextEditor> {
     switch (example) {
       case ToolbarExample.cupertino:
         return CupertinoSelectionToolbar(
-          actions: items(textSelection: textSelection),
+          actions: [
+            ContextMenuItem.sublist(title: Text('Format'), children: [
+              ContextMenuItem(
+                title: Icon(Icons.brush, size: 18),
+                onPressed: (menuController) {
+                  final selection =
+                      menuController.textSelectionController?.selection;
+                  if (selection == null) return true;
+                  controller.setStyle(
+                    selection,
+                    TextStyle(
+                      backgroundColor: Color(0xffd4ff32),
+                      color: Colors.black,
+                    ),
+                  );
+                  return true;
+                },
+              ),
+              ContextMenuItem(
+                title: Icon(
+                  Icons.format_bold,
+                  size: 18,
+                ),
+                onPressed: (menuController) {
+                  final selection =
+                      menuController.textSelectionController?.selection;
+                  if (selection == null) return true;
+                  controller.setStyle(
+                    selection,
+                    TextStyle(fontWeight: FontWeight.bold),
+                  );
+                  return true;
+                },
+              ),
+              ContextMenuItem(
+                title: Icon(
+                  Icons.format_italic,
+                  size: 18,
+                ),
+                onPressed: (menuController) {
+                  final selection =
+                      menuController.textSelectionController?.selection;
+                  if (selection == null) return true;
+                  controller.setStyle(
+                    selection,
+                    TextStyle(fontStyle: FontStyle.italic),
+                  );
+                  return true;
+                },
+              ),
+            ]),
+            if (textSelection) TextSelectionContextMenuItem.copy(),
+            if (textSelection) TextSelectionContextMenuItem.selectAll(),
+            ContextMenuItem(
+              title: Text('Search'),
+              onPressed: (menuController) {
+                return true;
+              },
+            ),
+            ContextMenuItem(
+              title: Text('Share'),
+              onPressed: (menuController) {
+                return true;
+              },
+            ),
+          ],
           theme: CupertinoThemeData(),
         );
 

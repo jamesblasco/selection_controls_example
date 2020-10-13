@@ -74,8 +74,10 @@ class _CupertinoTextSelectionToolbarWrapper extends StatefulWidget {
     this.handleSelectAll,
     this.isArrowPointingDown,
     this.items,
+    this.controller,
   }) : super(key: key);
 
+  final MenuContextController controller;
   final double arrowTipX;
   final double barTopY;
   final List<ContextMenuItem> items;
@@ -91,8 +93,7 @@ class _CupertinoTextSelectionToolbarWrapper extends StatefulWidget {
       _CupertinoTextSelectionToolbarWrapperState();
 }
 
-class CupertinoTextSelectionToolbarItemBuilder
-    extends ContextMenuItemBuilder {
+class CupertinoTextSelectionToolbarItemBuilder extends ContextMenuItemBuilder {
   final EdgeInsets arrowPadding;
 
   CupertinoTextSelectionToolbarItemBuilder({this.arrowPadding});
@@ -112,8 +113,8 @@ class CupertinoTextSelectionToolbarItemBuilder
       minSize: _kToolbarHeight,
       onPressed: () {
         final controller = DefaultMenuContextController.of(context);
-        controller.hide();
-        item.onPressed(controller);
+        final shouldHide = item.onPressed(controller);
+        if (shouldHide) controller.hide();
       },
       padding: _kToolbarButtonPadding.add(arrowPadding),
       pressedOpacity: 0.7,
@@ -130,9 +131,11 @@ class _CupertinoTextSelectionToolbarWrapperState
         : EdgeInsets.only(top: _kToolbarArrowSize.height);
     final Widget onePhysicalPixelVerticalDivider =
         SizedBox(width: 1.0 / MediaQuery.of(context).devicePixelRatio);
-
+    final controller = DefaultMenuContextController.of(context);
+    final menuContetItems =
+        controller.isNested ? controller.currentItems : widget.items;
     final List<Widget> items = <Widget>[
-      ...widget.items
+      ...menuContetItems
           .where((item) => item.enabled(context))
           .map((item) => item.buildItem(
                 context,
@@ -154,6 +157,23 @@ class _CupertinoTextSelectionToolbarWrapperState
               children: items,
             ),
     );
+  }
+
+  @override
+  void initState() {
+    widget.controller.addListener(update);
+    super.initState();
+  }
+
+  update() {
+    setState(() {});
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(update);
+
+    super.dispose();
   }
 }
 
@@ -1107,12 +1127,12 @@ class CupertinoSelectionToolbar extends ContextMenu {
 
   @override
   Widget buildToolbar(
-      BuildContext context,
-      Rect globalEditableRegion,
-      double textLineHeight,
-      Offset position,
-      List<TextSelectionPoint> endpoints,
-      ) {
+    BuildContext context,
+    Rect globalEditableRegion,
+    double textLineHeight,
+    Offset position,
+    List<TextSelectionPoint> endpoints,
+  ) {
     assert(debugCheckHasMediaQuery(context));
     final MediaQueryData mediaQuery = MediaQuery.of(context);
 
@@ -1143,6 +1163,7 @@ class CupertinoSelectionToolbar extends ContextMenu {
         : endpoints.last.point.dy + _kToolbarContentDistance;
 
     final child = _CupertinoTextSelectionToolbarWrapper(
+      controller: DefaultMenuContextController.of(context),
       arrowTipX: arrowTipX,
       barTopY: localBarTopY + globalEditableRegion.top,
       isArrowPointingDown: isArrowPointingDown,
@@ -1159,8 +1180,9 @@ class CupertinoSelectionToolbar extends ContextMenu {
   @override
   Widget buildContextMenu(BuildContext context) {
     return _CupertinoTextSelectionToolbarWrapper(
+      controller: DefaultMenuContextController.of(context),
       arrowTipX: 0,
-      barTopY: 0 ,
+      barTopY: 0,
       isArrowPointingDown: false,
       items: actions,
     );

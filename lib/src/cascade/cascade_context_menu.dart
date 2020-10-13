@@ -19,8 +19,8 @@ const double _kToolbarContentDistance = 8.0;
 const double _kToolbarDefaultWidth = 140.0;
 
 /// Manages a copy/paste text selection toolbar.
-class _TextSelectionToolbar extends StatefulWidget {
-  const _TextSelectionToolbar({
+class _CascadeContextMenu extends StatefulWidget {
+  const _CascadeContextMenu({
     Key key,
 
     this.items = const [],
@@ -51,7 +51,7 @@ class _TextSelectionToolbar extends StatefulWidget {
   final ThemeData theme;
 
   @override
-  _TextSelectionToolbarState createState() => _TextSelectionToolbarState();
+  _CascadeContextMenuState createState() => _CascadeContextMenuState();
 }
 
 class CascadeTextSelectionToolbarItemBuilder extends ContextMenuItemBuilder {
@@ -85,7 +85,7 @@ class CascadeTextSelectionToolbarItemBuilder extends ContextMenuItemBuilder {
   }
 }
 
-class _TextSelectionToolbarState extends State<_TextSelectionToolbar>
+class _CascadeContextMenuState extends State<_CascadeContextMenu>
     with TickerProviderStateMixin {
   // Whether or not the overflow menu is open. When it is closed, the menu
   // items that don't overflow are shown. When it is open, only the overflowing
@@ -129,7 +129,7 @@ class _TextSelectionToolbarState extends State<_TextSelectionToolbar>
   }
 
   @override
-  void didUpdateWidget(_TextSelectionToolbar oldWidget) {
+  void didUpdateWidget(_CascadeContextMenu oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.controller != widget.controller) {
       oldWidget.controller.removeListener(update);
@@ -680,7 +680,7 @@ class CascadeContextMenu extends ContextMenu {
 
   @override
   Widget buildContextMenu(BuildContext context) {
-    final child = _TextSelectionToolbar(
+    final child = _CascadeContextMenu(
       items: actions,
       width: width,
       shape: shape,

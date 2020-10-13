@@ -61,7 +61,6 @@ class CupertinoPullDownItemBuilder extends ContextMenuItemBuilder {
         onPressed: item.onPressed != null
             ? () {
                 final controller = DefaultMenuContextController.of(context);
-
                 final shouldHide = item.onPressed(controller);
                 if (shouldHide) controller.hide();
               }
