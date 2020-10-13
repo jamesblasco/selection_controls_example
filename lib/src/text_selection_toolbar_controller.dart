@@ -1,87 +1,45 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
-import 'package:selection_controls_example/src/text_selection_controls.dart';
+import 'package:selection_controls_example/context_menu.dart';
+
+import 'menu_context_controller.dart';
+
+typedef bool SelectionToolbarCallback(MenuContextController controller);
 
 
-typedef _TextSelectionToolbarBuilder = Widget Function(
-    List<TextSelectionToolbarItem> items);
-
-class TextSelectionToolbarController extends StatelessWidget {
-  final TextSelectionDelegate delegate;
-  final ClipboardStatusNotifier clipboardStatus;
-  final WidgetBuilder builder;
-
-  final VoidCallback cut;
-  final VoidCallback copy;
-  final VoidCallback paste;
-  final VoidCallback selectAll;
-
-  static _DefaultTextSelectionOptionsScope of(BuildContext context) => context
-      .dependOnInheritedWidgetOfExactType<_DefaultTextSelectionOptionsScope>();
+/// Manages a copy/paste text selection toolbar.
+class TextSelectionToolbarController extends StatefulWidget {
+  
+  static DefaultTextSelectionOptionsScope of(BuildContext context) => context
+      .dependOnInheritedWidgetOfExactType<DefaultTextSelectionOptionsScope>();
 
   const TextSelectionToolbarController({
-    Key key,
-    this.builder,
-    this.delegate,
     this.clipboardStatus,
+    Key key,
     this.cut,
     this.copy,
     this.paste,
     this.selectAll,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return _ClipboardToolbarItemsHandler(
-        clipboardStatus: clipboardStatus,
-        handleCopy: copy,
-        handleCut: cut,
-        handlePaste: paste,
-        handleSelectAll: selectAll,
-        builder: (defaultItems) {
-          return _DefaultTextSelectionOptionsScope(
-            clipboardStatus: clipboardStatus,
-            delegate: delegate,
-            cut: cut,
-            copy: copy,
-            paste: paste,
-            selectAll: selectAll,
-            defaultItems: defaultItems,
-            child: builder(context),
-          );
-        });
-  }
-}
-
-typedef SelectionToolbarCallback =  Function(_DefaultTextSelectionOptionsScope controller);
-
-/// Manages a copy/paste text selection toolbar.
-class _ClipboardToolbarItemsHandler extends StatefulWidget {
-  const _ClipboardToolbarItemsHandler({
-    this.clipboardStatus,
-    Key key,
-    this.handleCut,
-    this.handleCopy,
-    this.handlePaste,
-    this.handleSelectAll,
-    this.builder,
+    @required this.child,
+    this.delegate,
   }) : super(key: key);
 
   final ClipboardStatusNotifier clipboardStatus;
-  final VoidCallback handleCut;
-  final VoidCallback handleCopy;
-  final VoidCallback handlePaste;
-  final VoidCallback handleSelectAll;
-
-  final _TextSelectionToolbarBuilder builder;
+  final TextSelectionDelegate delegate;
+  final VoidCallback cut;
+  final VoidCallback copy;
+  final VoidCallback paste;
+  final VoidCallback selectAll;
+  final Widget child;
 
   @override
-  _ClipboardToolbarItemsHandlerState createState() =>
-      _ClipboardToolbarItemsHandlerState();
+  _TextSelectionToolbarControllerState createState() =>
+      _TextSelectionToolbarControllerState();
 }
 
-class _ClipboardToolbarItemsHandlerState
-    extends State<_ClipboardToolbarItemsHandler> with TickerProviderStateMixin {
+class _TextSelectionToolbarControllerState
+    extends State<TextSelectionToolbarController>
+    with TickerProviderStateMixin {
   ClipboardStatusNotifier _clipboardStatus;
 
   void _onChangedClipboardStatus() {
@@ -99,7 +57,7 @@ class _ClipboardToolbarItemsHandlerState
   }
 
   @override
-  void didUpdateWidget(_ClipboardToolbarItemsHandler oldWidget) {
+  void didUpdateWidget(TextSelectionToolbarController oldWidget) {
     super.didUpdateWidget(oldWidget);
 
     if (oldWidget.clipboardStatus == null && widget.clipboardStatus != null) {
@@ -117,7 +75,7 @@ class _ClipboardToolbarItemsHandlerState
         oldWidget.clipboardStatus.removeListener(_onChangedClipboardStatus);
       }
     }
-    if (widget.handlePaste != null) {
+    if (widget.paste != null) {
       _clipboardStatus.update();
     }
   }
@@ -138,38 +96,59 @@ class _ClipboardToolbarItemsHandlerState
   @override
   Widget build(BuildContext context) {
     // Don't render the menu until the state of the clipboard is known.
-    if (widget.handlePaste != null &&
+    if (widget.paste != null &&
         _clipboardStatus.value == ClipboardStatus.unknown) {
       return const SizedBox(width: 0.0, height: 0.0);
     }
 
     final MaterialLocalizations localizations =
         MaterialLocalizations.of(context);
-    final List<TextSelectionToolbarItem> itemDatas = <TextSelectionToolbarItem>[
-      if (widget.handleCut != null)
-        TextSelectionToolbarItem(
-          onPressed: (_) =>widget.handleCut(),
+    final List<ContextMenuItem> items = <ContextMenuItem>[
+      if (widget.cut != null)
+        ContextMenuItem(
+          onPressed: (_) {
+            widget.cut();
+            return true;
+          },
           title: Text(localizations.cutButtonLabel),
         ),
-      if (widget.handleCopy != null)
-        TextSelectionToolbarItem(
-            onPressed: (_) => widget.handleCopy(),
+      if (widget.copy != null)
+        ContextMenuItem(
+            onPressed: (_) {
+              widget.copy();
+              return true;
+            },
             title: Text(localizations.copyButtonLabel)),
-      if (widget.handlePaste != null &&
+      if (widget.paste != null &&
           _clipboardStatus.value == ClipboardStatus.pasteable)
-        TextSelectionToolbarItem(
-            onPressed: (_) => widget.handlePaste(),
+        ContextMenuItem(
+            onPressed: (_) {
+              widget.paste();
+              return true;
+            },
             title: Text(localizations.pasteButtonLabel)),
-      if (widget.handleSelectAll != null)
-        TextSelectionToolbarItem(
-            onPressed: (_) => widget.handleSelectAll(),
+      if (widget.selectAll != null)
+        ContextMenuItem(
+            onPressed: (_) {
+              widget.selectAll();
+              return true;
+            },
             title: Text(localizations.selectAllButtonLabel)),
     ];
-    return widget.builder(itemDatas);
+    return DefaultTextSelectionOptionsScope(
+      clipboardStatus: widget.clipboardStatus,
+      delegate: widget.delegate,
+      cut: widget.cut,
+      copy: widget.copy,
+      paste: widget.paste,
+      selectAll: widget.selectAll,
+      defaultItems: items,
+      child: widget.child,
+    );
   }
 }
 
-class _DefaultTextSelectionOptionsScope extends InheritedWidget {
+class DefaultTextSelectionOptionsScope extends InheritedWidget {
   final ClipboardStatusNotifier clipboardStatus;
   final TextSelectionDelegate delegate;
 
@@ -187,9 +166,10 @@ class _DefaultTextSelectionOptionsScope extends InheritedWidget {
   TextSelection get selection => delegate.textEditingValue.selection;
 
   final Widget child;
-  final List<TextSelectionToolbarItem> defaultItems;
 
-  _DefaultTextSelectionOptionsScope({
+  final List<ContextMenuItem> defaultItems;
+
+  DefaultTextSelectionOptionsScope({
     this.clipboardStatus,
     this.delegate,
     this.cut,
@@ -202,7 +182,7 @@ class _DefaultTextSelectionOptionsScope extends InheritedWidget {
 
   @override
   bool updateShouldNotify(
-      covariant _DefaultTextSelectionOptionsScope oldWidget) {
+      covariant DefaultTextSelectionOptionsScope oldWidget) {
     return cut != oldWidget.cut ||
         copy != oldWidget.copy ||
         paste != oldWidget.paste ||

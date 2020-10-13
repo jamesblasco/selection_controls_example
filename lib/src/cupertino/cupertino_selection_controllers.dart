@@ -12,7 +12,9 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import '../selection_toolbar_controller.dart';
+import 'package:selection_controls_example/src/menu_context_controller.dart';
+import '../../context_menu.dart';
+import '../text_selection_toolbar_controller.dart';
 import 'cupertino_selection_handle.dart';
 import '../text_selection_controls.dart';
 
@@ -76,7 +78,7 @@ class _CupertinoTextSelectionToolbarWrapper extends StatefulWidget {
 
   final double arrowTipX;
   final double barTopY;
-  final List<TextSelectionToolbarItem> items;
+  final List<ContextMenuItem> items;
   final ClipboardStatusNotifier clipboardStatus;
   final VoidCallback handleCut;
   final VoidCallback handleCopy;
@@ -89,6 +91,36 @@ class _CupertinoTextSelectionToolbarWrapper extends StatefulWidget {
       _CupertinoTextSelectionToolbarWrapperState();
 }
 
+class CupertinoTextSelectionToolbarItemBuilder
+    extends ContextMenuItemBuilder {
+  final EdgeInsets arrowPadding;
+
+  CupertinoTextSelectionToolbarItemBuilder({this.arrowPadding});
+
+  @override
+  Widget buildItem(BuildContext context, ContextMenuItem item) {
+    return CupertinoButton(
+      child: DefaultTextStyle(
+        overflow: TextOverflow.ellipsis,
+        style: _kToolbarButtonFontStyle,
+        child: IconTheme(
+            data: IconThemeData(color: CupertinoColors.white),
+            child: item.title),
+      ),
+      borderRadius: null,
+      color: _kToolbarBackgroundColor,
+      minSize: _kToolbarHeight,
+      onPressed: () {
+        final controller = DefaultMenuContextController.of(context);
+        controller.hide();
+        item.onPressed(controller);
+      },
+      padding: _kToolbarButtonPadding.add(arrowPadding),
+      pressedOpacity: 0.7,
+    );
+  }
+}
+
 class _CupertinoTextSelectionToolbarWrapperState
     extends State<_CupertinoTextSelectionToolbarWrapper> {
   @override
@@ -99,40 +131,14 @@ class _CupertinoTextSelectionToolbarWrapperState
     final Widget onePhysicalPixelVerticalDivider =
         SizedBox(width: 1.0 / MediaQuery.of(context).devicePixelRatio);
 
-    TextSelectionToolbarItemBuilder cupertinoItemBuilder = (
-      BuildContext context,
-      SelectionToolbarCallback onPressed,
-      Widget label,
-      bool isFirst,
-      bool isLast,
-    ) {
-      return CupertinoButton(
-        child: DefaultTextStyle(
-          overflow: TextOverflow.ellipsis,
-          style: _kToolbarButtonFontStyle,
-          child: label,
-        ),
-        borderRadius: null,
-        color: _kToolbarBackgroundColor,
-        minSize: _kToolbarHeight,
-        onPressed: () {
-          final controller = TextSelectionToolbarController.of(context);
-          controller.hide();
-          onPressed(controller);
-        },
-        padding: _kToolbarButtonPadding.add(arrowPadding),
-        pressedOpacity: 0.7,
-      );
-    };
-
     final List<Widget> items = <Widget>[
       ...widget.items
           .where((item) => item.enabled(context))
           .map((item) => item.buildItem(
                 context,
-                false,
-                false,
-                cupertinoItemBuilder,
+                CupertinoTextSelectionToolbarItemBuilder(
+                  arrowPadding: arrowPadding,
+                ),
               ))
           .addItemInBetween(onePhysicalPixelVerticalDivider)
     ];
@@ -1091,11 +1097,11 @@ enum _CupertinoTextSelectionToolbarItemsSlot {
   nextButtonDisabled,
 }
 
-class CupertinoSelectionToolbar extends TextSelectionToolbar {
+class CupertinoSelectionToolbar extends ContextMenu {
   CupertinoSelectionToolbar({
-    List<TextSelectionToolbarItem> items,
+    List<ContextMenuItem> actions,
     this.theme,
-  }) : super(items: items);
+  }) : super(actions: actions);
 
   final CupertinoThemeData theme;
 
@@ -1106,8 +1112,7 @@ class CupertinoSelectionToolbar extends TextSelectionToolbar {
       double textLineHeight,
       Offset position,
       List<TextSelectionPoint> endpoints,
-      TextSelectionDelegate delegate,
-      ClipboardStatusNotifier clipboardStatus) {
+      ) {
     assert(debugCheckHasMediaQuery(context));
     final MediaQueryData mediaQuery = MediaQuery.of(context);
 
@@ -1137,11 +1142,11 @@ class CupertinoSelectionToolbar extends TextSelectionToolbar {
             _kToolbarHeight
         : endpoints.last.point.dy + _kToolbarContentDistance;
 
-    final child =  _CupertinoTextSelectionToolbarWrapper(
+    final child = _CupertinoTextSelectionToolbarWrapper(
       arrowTipX: arrowTipX,
       barTopY: localBarTopY + globalEditableRegion.top,
       isArrowPointingDown: isArrowPointingDown,
-      items: items,
+      items: actions,
     );
 
     if (theme != null) {
@@ -1149,6 +1154,16 @@ class CupertinoSelectionToolbar extends TextSelectionToolbar {
     } else {
       return child;
     }
+  }
+
+  @override
+  Widget buildContextMenu(BuildContext context) {
+    return _CupertinoTextSelectionToolbarWrapper(
+      arrowTipX: 0,
+      barTopY: 0 ,
+      isArrowPointingDown: false,
+      items: actions,
+    );
   }
 }
 

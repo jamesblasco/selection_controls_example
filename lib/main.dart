@@ -1,9 +1,14 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:selection_controls_example/src/cascade/cascade_context_menu.dart';
+import 'package:selection_controls_example/src/context_menu_button.dart';
+import 'package:selection_controls_example/src/cupertino/cupertino_pull_down_menu.dart';
 import 'package:selection_controls_example/src/cupertino/cupertino_selection_controllers.dart';
 import 'package:selection_controls_example/src/cupertino/cupertino_selection_handle.dart';
 import 'package:selection_controls_example/src/material/material_selection_controllers.dart';
 import 'package:selection_controls_example/src/text_selection_controls.dart';
+
+import 'context_menu.dart';
 
 void main() {
   runApp(MyApp());
@@ -46,10 +51,8 @@ class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        body: Padding(
-      padding: EdgeInsets.all(20),
-      child: RichTextEditor(text: text),
-    ));
+      body: RichTextEditor(text: text),
+    );
   }
 }
 
@@ -75,8 +78,10 @@ class RichTextController extends ChangeNotifier {
   RichTextController(this._sourceText)
       : sections = [
           RichTextSection(
-            selection:
-                TextSelection(baseOffset: 0, extentOffset: _sourceText.length),
+            selection: TextSelection(
+              baseOffset: 0,
+              extentOffset: _sourceText.length,
+            ),
           )
         ];
 
@@ -110,7 +115,7 @@ class RichTextController extends ChangeNotifier {
       );
 }
 
-enum ToolbarExample { cupertino, material, custom }
+enum ToolbarExample { cupertino, material, custom, cascade, cupertinoPullDown }
 
 extension on ToolbarExample {
   String get title {
@@ -118,6 +123,8 @@ extension on ToolbarExample {
       ToolbarExample.cupertino: 'Cupertino',
       ToolbarExample.material: 'Material',
       ToolbarExample.custom: 'Custom',
+      ToolbarExample.cascade: 'Cascade',
+      ToolbarExample.cupertinoPullDown: 'Cupertino PullDown',
     }[this];
   }
 }
@@ -161,11 +168,65 @@ class _RichTextEditorState extends State<RichTextEditor> {
 
   @override
   Widget build(BuildContext context) {
-    final items = [
-      TextSelectionToolbarItem(
+    return Scaffold(
+      appBar: AppBar(
+        title: ContextMenuButton(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.menu),
+              SizedBox(width: 20),
+              Text('Menus'),
+            ],
+          ),
+          tooltip: 'This is tooltip',
+          menu: menu(textSelection: false),
+        ),
+        backgroundColor: Colors.white,
+        bottom: PreferredSize(
+          preferredSize: Size(double.infinity, 40),
+          child: Padding(
+            padding: EdgeInsets.all(6),
+            child: CupertinoSlidingSegmentedControl(
+              backgroundColor: Colors.grey[100],
+              groupValue: example,
+              onValueChanged: (value) {
+                setState(() {
+                  example = value;
+                });
+              },
+              children: Map.fromEntries(
+                ToolbarExample.values.map(
+                  (example) => MapEntry(example, Text(example.title)),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+      body: Padding(
+        padding: EdgeInsets.all(20),
+        child: SelectableText.rich(
+          controller.textSpan,
+          cursorColor: Colors.black,
+          style: TextStyle(color: Colors.grey[700], fontSize: 16),
+          toolbarOptions: ToolbarOptions(copy: true),
+          textSelectionControls: DefaultTextSelectionControls(
+            handle: CupertinoTextSelectionHandle(color: Colors.black),
+            toolbar: menu(textSelection: true),
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<ContextMenuItem> items({bool textSelection = false}) {
+    return [
+      ContextMenuItem(
         title: Icon(Icons.brush, size: 18),
-        onPressed: (selectionController) {
-          final selection = selectionController.selection;
+        onPressed: (menuController) {
+          final selection = menuController.textSelectionController?.selection;
+          if (selection == null) return true;
           controller.setStyle(
             selection,
             TextStyle(
@@ -173,91 +234,55 @@ class _RichTextEditorState extends State<RichTextEditor> {
               color: Colors.black,
             ),
           );
+          return true;
         },
       ),
-      TextSelectionToolbarItem(
+      ContextMenuItem(
         title: Icon(
           Icons.format_bold,
           size: 18,
         ),
-        onPressed: (selectionController) {
-          final selection = selectionController.selection;
+        onPressed: (menuController) {
+          final selection = menuController.textSelectionController?.selection;
+          if (selection == null) return true;
           controller.setStyle(
             selection,
             TextStyle(fontWeight: FontWeight.bold),
           );
+          return true;
         },
       ),
-      TextSelectionToolbarItem(
+      ContextMenuItem(
         title: Icon(
           Icons.format_italic,
           size: 18,
         ),
-        onPressed: (selectionController) {
-          final selection = selectionController.selection;
+        onPressed: (menuController) {
+          final selection = menuController.textSelectionController?.selection;
+          if (selection == null) return true;
           controller.setStyle(
             selection,
             TextStyle(fontStyle: FontStyle.italic),
           );
+          return true;
         },
       ),
-      TextSelectionToolbarItem.copy(),
-      TextSelectionToolbarItem.paste()
+      if (textSelection) TextSelectionContextMenuItem.copy(),
+      //  TextSelectionToolbarItem.paste()
     ];
-    return Scaffold(
-      body: Center(
-        child: SafeArea(
-          bottom: false,
-          child: Stack(
-            children: [
-              SelectableText.rich(
-                controller.textSpan,
-                cursorColor: Colors.black,
-                style: TextStyle(color: Colors.grey[700], fontSize: 16),
-                toolbarOptions: ToolbarOptions(copy: true),
-                textSelectionControls: DefaultTextSelectionControls(
-                  handle: CupertinoTextSelectionHandle(color: Colors.black),
-                  toolbar: toolbar(items),
-                ),
-              ),
-              Positioned(
-                left: 20,
-                bottom: MediaQuery.of(context).padding.top + 20,
-                right: 20,
-                child: CupertinoSlidingSegmentedControl(
-                  backgroundColor: Colors.grey[100],
-                  groupValue: example,
-                  onValueChanged: (value) {
-                    setState(() {
-                      example = value;
-                    });
-                  },
-                  children: Map.fromEntries(
-                    ToolbarExample.values.map((e) => MapEntry(
-                          e,
-                          Text(e.title),
-                        )),
-                  ),
-                ),
-              )
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
-  TextSelectionToolbar toolbar(List<TextSelectionToolbarItem> items) {
+  ContextMenu menu({bool textSelection = false}) {
     switch (example) {
       case ToolbarExample.cupertino:
         return CupertinoSelectionToolbar(
-          items: items,
+          actions: items(textSelection: textSelection),
           theme: CupertinoThemeData(),
         );
 
       case ToolbarExample.material:
         return MaterialSelectionToolbar(
-          items: items,
+          actions: items(textSelection: textSelection),
         );
 
       case ToolbarExample.custom:
@@ -266,10 +291,467 @@ class _RichTextEditorState extends State<RichTextEditor> {
           shape: BeveledRectangleBorder(
               borderRadius: BorderRadius.circular(12), side: BorderSide()),
           theme: ThemeData.dark(),
-          items: items,
+          actions: items(textSelection: textSelection),
+        );
+      case ToolbarExample.cascade:
+        return CascadeContextMenu(elevation: 12, actions: nestedItems());
+      case ToolbarExample.material:
+        return MaterialSelectionToolbar(
+          actions: items(textSelection: textSelection),
+        );
+      case ToolbarExample.cupertinoPullDown:
+        return CupertinoPullDownMenu(
+          actions: cupertinoNestedItems(),
         );
     }
     return null;
+  }
+
+  List<ContextMenuItem> nestedItems() {
+    return [
+      ContextMenuItem(
+        title: Row(
+          children: [
+            Icon(Icons.brush, size: 16),
+            SizedBox(width: 10),
+            Text('Highlight'),
+          ],
+        ),
+        onPressed: (menuController) {
+          final selection = menuController.textSelectionController?.selection;
+          if (selection == null) return true;
+          controller.setStyle(
+            selection,
+            TextStyle(
+              backgroundColor: Color(0xffd4ff32),
+              color: Colors.black,
+            ),
+          );
+          return true;
+        },
+      ),
+      ContextMenuItem(
+        title: Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.ideographic,
+          //mainAxisAlignment: MainAxisAlignment.center,
+
+          children: [
+            Icon(
+              Icons.format_bold_rounded,
+              size: 16,
+            ),
+            SizedBox(
+              width: 10,
+            ),
+            Text('Bold'),
+          ],
+        ),
+        onPressed: (menuController) {
+          final selection = menuController.textSelectionController?.selection;
+          if (selection == null) return true;
+          controller.setStyle(
+            selection,
+            TextStyle(fontWeight: FontWeight.bold),
+          );
+          return true;
+        },
+      ),
+      ContextMenuItem(
+        title: Row(
+          children: [
+            Icon(Icons.format_italic, size: 16),
+            SizedBox(width: 10),
+            Text('Italic'),
+          ],
+        ),
+        onPressed: (menuController) {
+          final selection = menuController.textSelectionController?.selection;
+          if (selection == null) return true;
+          controller.setStyle(
+            selection,
+            TextStyle(fontStyle: FontStyle.italic),
+          );
+          return true;
+        },
+      ),
+      ContextMenuItem.custom(
+        child: Divider(height: 1),
+      ),
+      ContextMenuItem(
+        title: Row(
+          children: [
+            Icon(Icons.copy, size: 16),
+            SizedBox(width: 10),
+            Text('Copy'),
+          ],
+        ),
+        onPressed: (menuController) {
+          final selection = menuController.textSelectionController?.selection;
+          if (selection == null) return true;
+          controller.setStyle(
+            selection,
+            TextStyle(fontStyle: FontStyle.italic),
+          );
+          return true;
+        },
+      ),
+      ContextMenuItem(
+        title: Row(
+          children: [
+            Icon(Icons.paste, size: 16),
+            SizedBox(width: 10),
+            Text('Paste'),
+          ],
+        ),
+        onPressed: (menuController) {
+          final selection = menuController.textSelectionController?.selection;
+          if (selection == null) return true;
+          controller.setStyle(
+            selection,
+            TextStyle(fontStyle: FontStyle.italic),
+          );
+          return true;
+        },
+      ),
+      ContextMenuItem.custom(
+        child: Divider(height: 1),
+      ),
+      ContextMenuItem(
+        title: Row(
+          children: [
+            Icon(Icons.edit, size: 16),
+            SizedBox(width: 10),
+            Text('Rename'),
+          ],
+        ),
+        onPressed: (menuController) {
+          final selection = menuController.textSelectionController?.selection;
+          if (selection == null) return true;
+          controller.setStyle(
+            selection,
+            TextStyle(fontStyle: FontStyle.italic),
+          );
+          return true;
+        },
+      ),
+      ContextMenuItem.sublist(
+          title: Row(
+            children: [
+              Icon(Icons.more_vert, size: 16),
+              SizedBox(width: 10),
+              Text('More'),
+              Spacer(),
+              Icon(Icons.arrow_right_rounded, size: 16),
+            ],
+          ),
+          children: [
+            ContextMenuItem(
+              title: Row(
+                children: [
+                  Icon(Icons.arrow_left_rounded, size: 16),
+                  SizedBox(width: 10),
+                  Text(
+                    'More',
+                    style: Theme.of(context).textTheme.caption,
+                  ),
+                ],
+              ),
+              onPressed: (menuController) {
+                menuController.pop();
+                return false;
+              },
+            ),
+            ContextMenuItem(
+              title: Row(
+                children: [
+                  Icon(Icons.brush, size: 16),
+                  SizedBox(width: 10),
+                  Text('Highlight'),
+                ],
+              ),
+              onPressed: (c) {
+                final selection = c.textSelectionController?.selection;
+                if (selection == null) return true;
+                controller.setStyle(
+                  selection,
+                  TextStyle(
+                    backgroundColor: Color(0xffd4ff32),
+                    color: Colors.black,
+                  ),
+                );
+                return true;
+              },
+            ),
+            ContextMenuItem(
+              title: Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.ideographic,
+                //mainAxisAlignment: MainAxisAlignment.center,
+
+                children: [
+                  Icon(
+                    Icons.format_bold_rounded,
+                    size: 16,
+                  ),
+                  SizedBox(
+                    width: 10,
+                  ),
+                  Text('Bold'),
+                ],
+              ),
+              onPressed: (menuController) {
+                final selection =
+                    menuController.textSelectionController?.selection;
+                if (selection == null) return true;
+                controller.setStyle(
+                  selection,
+                  TextStyle(fontWeight: FontWeight.bold),
+                );
+                return true;
+              },
+            ),
+            ContextMenuItem(
+              title: Row(
+                children: [
+                  Icon(Icons.format_italic, size: 16),
+                  SizedBox(width: 10),
+                  Text('Italic'),
+                ],
+              ),
+              onPressed: (menuController) {
+                final selection =
+                    menuController.textSelectionController?.selection;
+                if (selection == null) return true;
+                controller.setStyle(
+                  selection,
+                  TextStyle(fontStyle: FontStyle.italic),
+                );
+                return true;
+              },
+            ),
+          ]),
+    ];
+  }
+
+  List<ContextMenuItem> cupertinoNestedItems() {
+    return [
+      ContextMenuItem(
+        title: Row(
+          children: [
+            Text('Highlight'),
+            Spacer(),
+            Icon(Icons.brush, size: 16),
+          ],
+        ),
+        onPressed: (menuController) {
+          final selection = menuController.textSelectionController?.selection;
+          if (selection == null) return true;
+          controller.setStyle(
+            selection,
+            TextStyle(
+              backgroundColor: Color(0xffd4ff32),
+              color: Colors.black,
+            ),
+          );
+          return true;
+        },
+      ),
+      ContextMenuItem(
+        title: Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.ideographic,
+          //mainAxisAlignment: MainAxisAlignment.center,
+
+          children: [
+            Text('Bold'),
+            Spacer(),
+            Icon(Icons.format_bold_rounded, size: 16),
+          ],
+        ),
+        onPressed: (menuController) {
+          final selection = menuController.textSelectionController?.selection;
+          if (selection == null) return true;
+          controller.setStyle(
+            selection,
+            TextStyle(fontWeight: FontWeight.bold),
+          );
+          return true;
+        },
+      ),
+      ContextMenuItem(
+        title: Row(
+          children: [
+            Text('Italic'),
+            Spacer(),
+            Icon(Icons.format_italic, size: 16),
+          ],
+        ),
+        onPressed: (menuController) {
+          final selection = menuController.textSelectionController?.selection;
+          if (selection == null) return true;
+          controller.setStyle(
+            selection,
+            TextStyle(fontStyle: FontStyle.italic),
+          );
+          return true;
+        },
+      ),
+      ContextMenuItem.custom(
+        child: Divider(height: 1),
+      ),
+      ContextMenuItem(
+        title: Row(
+          children: [
+            Text('Copy'),
+            Spacer(),
+            Icon(Icons.copy, size: 16),
+          ],
+        ),
+        onPressed: (menuController) {
+          final selection = menuController.textSelectionController?.selection;
+          if (selection == null) return true;
+          controller.setStyle(
+            selection,
+            TextStyle(fontStyle: FontStyle.italic),
+          );
+          return true;
+        },
+      ),
+      ContextMenuItem(
+        title: Row(
+          children: [
+            Text('Paste'),
+            Spacer(),
+            Icon(Icons.paste, size: 16),
+          ],
+        ),
+        onPressed: (menuController) {
+          final selection = menuController.textSelectionController?.selection;
+          if (selection == null) return true;
+          controller.setStyle(
+            selection,
+            TextStyle(fontStyle: FontStyle.italic),
+          );
+          return true;
+        },
+      ),
+      ContextMenuItem.custom(
+        child: Divider(height: 1),
+      ),
+      ContextMenuItem(
+        title: Row(
+          children: [
+            Text('Rename'),
+            Spacer(),
+            Icon(Icons.edit, size: 16),
+          ],
+        ),
+        onPressed: (menuController) {
+          final selection = menuController.textSelectionController?.selection;
+          if (selection == null) return true;
+          controller.setStyle(
+            selection,
+            TextStyle(fontStyle: FontStyle.italic),
+          );
+          return true;
+        },
+      ),
+      ContextMenuItem.sublist(
+          title: Row(
+            children: [
+              Text('More'),
+              Spacer(),
+              Icon(Icons.arrow_right_rounded, size: 16),
+            ],
+          ),
+          children: [
+            ContextMenuItem(
+              title: Row(
+                children: [
+                  Icon(Icons.arrow_left_rounded, size: 16),
+                  SizedBox(width: 10),
+                  Text(
+                    'More',
+                    style: Theme.of(context).textTheme.caption,
+                  ),
+                ],
+              ),
+              onPressed: (menuController) {
+                menuController.pop();
+                return false;
+              },
+            ),
+            ContextMenuItem(
+              title: Row(
+                children: [
+                  Icon(Icons.brush, size: 16),
+                  SizedBox(width: 10),
+                  Text('Highlight'),
+                ],
+              ),
+              onPressed: (c) {
+                final selection = c.textSelectionController?.selection;
+                if (selection == null) return true;
+                controller.setStyle(
+                  selection,
+                  TextStyle(
+                    backgroundColor: Color(0xffd4ff32),
+                    color: Colors.black,
+                  ),
+                );
+                return true;
+              },
+            ),
+            ContextMenuItem(
+              title: Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.ideographic,
+                //mainAxisAlignment: MainAxisAlignment.center,
+
+                children: [
+                  Icon(
+                    Icons.format_bold_rounded,
+                    size: 16,
+                  ),
+                  SizedBox(
+                    width: 10,
+                  ),
+                  Text('Bold'),
+                ],
+              ),
+              onPressed: (menuController) {
+                final selection =
+                    menuController.textSelectionController?.selection;
+                if (selection == null) return true;
+                controller.setStyle(
+                  selection,
+                  TextStyle(fontWeight: FontWeight.bold),
+                );
+                return true;
+              },
+            ),
+            ContextMenuItem(
+              title: Row(
+                children: [
+                  Icon(Icons.format_italic, size: 16),
+                  SizedBox(width: 10),
+                  Text('Italic'),
+                ],
+              ),
+              onPressed: (menuController) {
+                final selection =
+                    menuController.textSelectionController?.selection;
+                if (selection == null) return true;
+                controller.setStyle(
+                  selection,
+                  TextStyle(fontStyle: FontStyle.italic),
+                );
+                return true;
+              },
+            ),
+          ]),
+    ];
   }
 }
 

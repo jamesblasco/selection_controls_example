@@ -1,53 +1,86 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:selection_controls_example/context_menu.dart';
+import 'package:selection_controls_example/src/menu_context_controller.dart';
 import 'dart:math' as math;
 
-import '../menu_context_controller.dart';
+import '../../context_menu.dart';
 import '../text_selection_toolbar_controller.dart';
 import '../text_selection_controls.dart';
-
-const double _kHandleSize = 22.0;
 
 // Minimal padding from all edges of the selection toolbar to all edges of the
 // viewport.
 const double _kToolbarScreenPadding = 8.0;
-const double _kToolbarHeight = 44.0;
+
 // Padding when positioning toolbar below selection.
-const double _kToolbarContentDistanceBelow = _kHandleSize - 2.0;
+
 const double _kToolbarContentDistance = 8.0;
 
+const double _kToolbarDefaultWidth = 160.0;
+
 /// Manages a copy/paste text selection toolbar.
-class _ContextMenu extends StatefulWidget {
-  const _ContextMenu({
+class _CupertinoPullDownContainer extends StatefulWidget {
+  const _CupertinoPullDownContainer({
     Key key,
     this.isAbove,
     this.items = const [],
-    this.backgroundColor,
-    this.elevation,
-    this.clipBehavior,
-    this.shape,
-    this.theme,
-  }) : super(key: key);
+    this.width = _kToolbarDefaultWidth,
+    this.controller,
+  })  : assert(width != null),
+        super(key: key);
 
   final List<ContextMenuItem> items;
 
   // When true, the toolbar fits above its anchor and will be positioned there.
   final bool isAbove;
 
-  final Color backgroundColor;
-  final double elevation;
+  final double width;
 
-  final Clip clipBehavior;
-  final ShapeBorder shape;
-  final ThemeData theme;
+  final MenuContextController controller;
 
   @override
-  _ContextMenuState createState() => _ContextMenuState();
+  _CupertinoPullDownContainerState createState() =>
+      _CupertinoPullDownContainerState();
 }
 
-class _ContextMenuState extends State<_ContextMenu>
-    with TickerProviderStateMixin {
+class CupertinoPullDownItemBuilder extends ContextMenuItemBuilder {
+  final bool isLast;
+
+  CupertinoPullDownItemBuilder({this.isLast = false});
+  @override
+  Widget buildItem(BuildContext context, ContextMenuItem item) {
+    //This is not accurate and needs to be changed
+    return DecoratedBox(
+      decoration: BoxDecoration(
+       border: Border(bottom: BorderSide(color: CupertinoColors.systemGrey5))
+      ),
+      child: CupertinoButton(
+        minSize: 20,
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        borderRadius: BorderRadius.zero,
+        onPressed: item.onPressed != null
+            ? () {
+                final controller = DefaultMenuContextController.of(context);
+
+                final shouldHide = item.onPressed(controller);
+                if (shouldHide) controller.hide();
+              }
+            : null,
+        child: DefaultTextStyle(
+          child: CupertinoTheme(
+              child: item.title,
+              data: CupertinoThemeData(primaryColor: Colors.black)),
+          style: TextStyle(
+            color: CupertinoColors.black,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CupertinoPullDownContainerState
+    extends State<_CupertinoPullDownContainer> with TickerProviderStateMixin {
   // Whether or not the overflow menu is open. When it is closed, the menu
   // items that don't overflow are shown. When it is open, only the overflowing
   // menu items are shown.
@@ -71,81 +104,95 @@ class _ContextMenuState extends State<_ContextMenu>
   }
 
   @override
-  void didUpdateWidget(_ContextMenu oldWidget) {
+  void initState() {
+    widget.controller.addListener(update);
+    super.initState();
+  }
+
+  update() {
+    setState(() {
+      _reset();
+    });
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(update);
+
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(_CupertinoPullDownContainer oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(update);
+      widget.controller.addListener(update);
+    }
     if (widget.items != oldWidget.items) {
       _reset();
     }
   }
 
-  Widget _getItem(
-      ContextMenuItem itemData, bool isFirst, bool isLast) {
+  Widget _getItem(ContextMenuItem itemData, bool isFirst, bool isLast) {
     assert(isFirst != null);
     assert(isLast != null);
+
     return itemData.buildItem(
-      context,
-      MaterialTextSelectionToolbarItemBuilder(isFirst: isFirst, isLast: isLast),
-    );
+        context, CupertinoPullDownItemBuilder(isLast: isLast));
   }
 
   @override
   Widget build(BuildContext context) {
-    final MaterialLocalizations localizations =
-        MaterialLocalizations.of(context);
-
-    final items = [
-      ...widget.items.where((element) => element.enabled(context))
-    ];
-    if (items.isEmpty) {
+    if (widget.items.isEmpty) {
       return const SizedBox(width: 0.0, height: 0.0);
     }
-
-    return _ContextMenuContainer(
-      key: _containerKey,
-      overflowOpen: _overflowOpen,
-      child: AnimatedSize(
-        vsync: this,
-        // This duration was eyeballed on a Pixel 2 emulator running Android
-        // API 28.
-        duration: const Duration(milliseconds: 140),
-        child: Material(
-          // This value was eyeballed to match the native text selection menu on
-          // a Pixel 2 running Android 10.
-          borderRadius: widget.shape == null
-              ? const BorderRadius.all(Radius.circular(7.0))
-              : null,
-          shape: widget.shape,
-          clipBehavior: widget.clipBehavior ?? Clip.antiAlias,
-          elevation: widget.elevation ?? 1.0,
-          color: widget.backgroundColor,
-          type: MaterialType.card,
-          child: _TextSelectionToolbarItems(
-            isAbove: widget.isAbove,
-            overflowOpen: _overflowOpen,
-            children: <Widget>[
-              // The navButton that shows and hides the overflow menu is the
-              // first child.
-              Material(
-                type: MaterialType.card,
-                child: IconButton(
-                  // TODO(justinmc): This should be an AnimatedIcon, but
-                  // AnimatedIcons doesn't yet support arrow_back to more_vert.
-                  // https://github.com/flutter/flutter/issues/51209
-                  icon:
-                      Icon(_overflowOpen ? Icons.arrow_back : Icons.more_vert),
-                  onPressed: () {
-                    setState(() {
-                      _overflowOpen = !_overflowOpen;
-                    });
-                  },
-                  tooltip: _overflowOpen
-                      ? localizations.backButtonTooltip
-                      : localizations.moreButtonTooltip,
+    final theme = CupertinoTheme.of(context) ?? CupertinoThemeData();
+    final controller = DefaultMenuContextController.of(context);
+    return AnimatedSize(
+      alignment: Alignment.topCenter,
+      vsync: this,
+      // This duration was eyeballed on a Pixel 2 emulator running Android
+      // API 28.
+      duration: const Duration(milliseconds: 140),
+      child: _TextSelectionToolbarContainer(
+        key: _containerKey,
+        overflowOpen: _overflowOpen,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+              color: theme.scaffoldBackgroundColor,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black12,
+                  spreadRadius: 40,
+                  blurRadius: 80,
                 ),
+              ]),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                //   isAbove: widget.isAbove,
+                children: <Widget>[
+                  if (controller.isNested)
+                    for (int i = 0; i < controller.currentItems.length; i++)
+                      SizedBox(
+                        width: widget.width,
+                        child: _getItem(widget.items[i], i == 0,
+                            i == controller.currentItems.length - 1),
+                      )
+                  else
+                    for (int i = 0; i < widget.items.length; i++)
+                      SizedBox(
+                        width: widget.width,
+                        child: _getItem(widget.items[i], i == 0,
+                            i == widget.items.length - 1),
+                      ),
+                ],
               ),
-              for (int i = 0; i < items.length; i++)
-                _getItem(items[i], i == 0, i == items.length - 1),
-            ],
+            ),
           ),
         ),
       ),
@@ -156,8 +203,8 @@ class _ContextMenuState extends State<_ContextMenu>
 // When the overflow menu is open, it tries to align its right edge to the right
 // edge of the closed menu. This widget handles this effect by measuring and
 // maintaining the width of the closed menu and aligning the child to the right.
-class _ContextMenuContainer extends SingleChildRenderObjectWidget {
-  const _ContextMenuContainer({
+class _TextSelectionToolbarContainer extends SingleChildRenderObjectWidget {
+  const _TextSelectionToolbarContainer({
     Key key,
     @required Widget child,
     @required this.overflowOpen,
@@ -168,20 +215,20 @@ class _ContextMenuContainer extends SingleChildRenderObjectWidget {
   final bool overflowOpen;
 
   @override
-  _ContextMenuToolbarContainerRenderBox createRenderObject(
+  _TextSelectionToolbarContainerRenderBox createRenderObject(
       BuildContext context) {
-    return _ContextMenuToolbarContainerRenderBox(overflowOpen: overflowOpen);
+    return _TextSelectionToolbarContainerRenderBox(overflowOpen: overflowOpen);
   }
 
   @override
   void updateRenderObject(BuildContext context,
-      _ContextMenuToolbarContainerRenderBox renderObject) {
+      _TextSelectionToolbarContainerRenderBox renderObject) {
     renderObject.overflowOpen = overflowOpen;
   }
 }
 
-class _ContextMenuToolbarContainerRenderBox extends RenderProxyBox {
-  _ContextMenuToolbarContainerRenderBox({
+class _TextSelectionToolbarContainerRenderBox extends RenderProxyBox {
+  _TextSelectionToolbarContainerRenderBox({
     @required bool overflowOpen,
   })  : assert(overflowOpen != null),
         _overflowOpen = overflowOpen,
@@ -190,7 +237,7 @@ class _ContextMenuToolbarContainerRenderBox extends RenderProxyBox {
   // The width of the menu when it was closed. This is used to achieve the
   // behavior where the open menu aligns its right edge to the closed menu's
   // right edge.
-  double _closedWidth;
+  double _closedHeight;
 
   bool _overflowOpen;
   bool get overflowOpen => _overflowOpen;
@@ -210,26 +257,26 @@ class _ContextMenuToolbarContainerRenderBox extends RenderProxyBox {
     // is invalid, so it's important that this RenderBox be recreated in that
     // case. Currently, this is achieved by providing a new key to
     // _TextSelectionToolbarContainer.
-    if (!overflowOpen && _closedWidth == null) {
-      _closedWidth = child.size.width;
+    if (!overflowOpen && _closedHeight == null) {
+      _closedHeight = child.size.height;
     }
 
     size = constraints.constrain(Size(
+      child.size.width,
       // If the open menu is wider than the closed menu, just use its own width
       // and don't worry about aligning the right edges.
       // _closedWidth is used even when the menu is closed to allow it to
       // animate its size while keeping the same right alignment.
-      _closedWidth == null || child.size.width > _closedWidth
-          ? child.size.width
-          : _closedWidth,
-      child.size.height,
+      _closedHeight == null || child.size.height > _closedHeight
+          ? child.size.height
+          : _closedHeight,
     ));
 
     final ToolbarItemsParentData childParentData =
         child.parentData as ToolbarItemsParentData;
     childParentData.offset = Offset(
-      size.width - child.size.width,
       0.0,
+      size.height - child.size.height,
     );
   }
 
@@ -279,30 +326,24 @@ class _TextSelectionToolbarItems extends MultiChildRenderObjectWidget {
   _TextSelectionToolbarItems({
     Key key,
     @required this.isAbove,
-    @required this.overflowOpen,
     @required List<Widget> children,
   })  : assert(children != null),
         assert(isAbove != null),
-        assert(overflowOpen != null),
         super(key: key, children: children);
 
   final bool isAbove;
-  final bool overflowOpen;
 
   @override
   _TextSelectionToolbarItemsRenderBox createRenderObject(BuildContext context) {
     return _TextSelectionToolbarItemsRenderBox(
       isAbove: isAbove,
-      overflowOpen: overflowOpen,
     );
   }
 
   @override
   void updateRenderObject(
       BuildContext context, _TextSelectionToolbarItemsRenderBox renderObject) {
-    renderObject
-      ..isAbove = isAbove
-      ..overflowOpen = overflowOpen;
+    renderObject..isAbove = isAbove;
   }
 
   @override
@@ -330,11 +371,8 @@ class _TextSelectionToolbarItemsRenderBox extends RenderBox
     with ContainerRenderObjectMixin<RenderBox, ToolbarItemsParentData> {
   _TextSelectionToolbarItemsRenderBox({
     @required bool isAbove,
-    @required bool overflowOpen,
-  })  : assert(overflowOpen != null),
-        assert(isAbove != null),
+  })  : assert(isAbove != null),
         _isAbove = isAbove,
-        _overflowOpen = overflowOpen,
         super();
 
   // The index of the last item that doesn't overflow.
@@ -350,45 +388,25 @@ class _TextSelectionToolbarItemsRenderBox extends RenderBox
     markNeedsLayout();
   }
 
-  bool _overflowOpen;
-  bool get overflowOpen => _overflowOpen;
-  set overflowOpen(bool value) {
-    if (value == overflowOpen) {
-      return;
-    }
-    _overflowOpen = value;
-    markNeedsLayout();
-  }
-
   // Layout the necessary children, and figure out where the children first
   // overflow, if at all.
   void _layoutChildren() {
     // When overflow is not open, the toolbar is always a specific height.
-    final BoxConstraints sizedConstraints = _overflowOpen
-        ? constraints
-        : BoxConstraints.loose(Size(
-            constraints.maxWidth,
-            _kToolbarHeight,
-          ));
+    final BoxConstraints sizedConstraints = BoxConstraints.loose(Size(
+      constraints.maxWidth,
+      constraints.maxHeight,
+    ));
 
     int i = -1;
-    double width = 0.0;
+    double height = 0.0;
     visitChildren((RenderObject renderObjectChild) {
       i++;
 
-      // No need to layout children inside the overflow menu when it's closed.
-      // The opposite is not true. It is necessary to layout the children that
-      // don't overflow when the overflow menu is open in order to calculate
-      // _lastIndexThatFits.
-      if (_lastIndexThatFits != -1 && !overflowOpen) {
-        return;
-      }
-
       final RenderBox child = renderObjectChild as RenderBox;
       child.layout(sizedConstraints.loosen(), parentUsesSize: true);
-      width += child.size.width;
+      height += child.size.width;
 
-      if (width > sizedConstraints.maxWidth && _lastIndexThatFits == -1) {
+      if (height > sizedConstraints.maxHeight && _lastIndexThatFits == -1) {
         _lastIndexThatFits = i - 1;
       }
     });
@@ -398,28 +416,9 @@ class _TextSelectionToolbarItemsRenderBox extends RenderBox
     final RenderBox navButton = firstChild;
     if (_lastIndexThatFits != -1 &&
         _lastIndexThatFits == childCount - 2 &&
-        width - navButton.size.width <= sizedConstraints.maxWidth) {
+        height - navButton.size.height <= sizedConstraints.maxHeight) {
       _lastIndexThatFits = -1;
     }
-  }
-
-  // Returns true when the child should be painted, false otherwise.
-  bool _shouldPaintChild(RenderObject renderObjectChild, int index) {
-    // Paint the navButton when there is overflow.
-    if (renderObjectChild == firstChild) {
-      return _lastIndexThatFits != -1;
-    }
-
-    // If there is no overflow, all children besides the navButton are painted.
-    if (_lastIndexThatFits == -1) {
-      return true;
-    }
-
-    // When there is overflow, paint if the child is in the part of the menu
-    // that is currently open. Overflowing children are painted when the
-    // overflow menu is open, and the children that fit are painted when the
-    // overflow menu is closed.
-    return (index > _lastIndexThatFits) == overflowOpen;
   }
 
   // Decide which children will be pained and set their shouldPaint, and set the
@@ -427,10 +426,9 @@ class _TextSelectionToolbarItemsRenderBox extends RenderBox
   void _placeChildren() {
     int i = -1;
     Size nextSize = const Size(0.0, 0.0);
-    double fitWidth = 0.0;
+    double fitHeight = 0.0;
     final RenderBox navButton = firstChild;
-    double overflowHeight =
-        overflowOpen && !isAbove ? navButton.size.height : 0.0;
+
     visitChildren((RenderObject renderObjectChild) {
       i++;
 
@@ -443,49 +441,21 @@ class _TextSelectionToolbarItemsRenderBox extends RenderBox
         return;
       }
 
-      // There is no need to place children that won't be painted.
-      if (!_shouldPaintChild(renderObjectChild, i)) {
-        childParentData.shouldPaint = false;
-        return;
-      }
       childParentData.shouldPaint = true;
 
-      if (!overflowOpen) {
-        childParentData.offset = Offset(fitWidth, 0.0);
-        fitWidth += child.size.width;
-        nextSize = Size(
-          fitWidth,
-          math.max(child.size.height, nextSize.height),
-        );
-      } else {
-        childParentData.offset = Offset(0.0, overflowHeight);
-        overflowHeight += child.size.height;
-        nextSize = Size(
-          math.max(child.size.width, nextSize.width),
-          overflowHeight,
-        );
-      }
+      childParentData.offset = Offset(0.0, fitHeight);
+      fitHeight += child.size.height;
+      nextSize = Size(
+        math.max(child.size.width, nextSize.width),
+        fitHeight,
+      );
     });
 
     // Place the navigation button if needed.
     final ToolbarItemsParentData navButtonParentData =
         navButton.parentData as ToolbarItemsParentData;
-    if (_shouldPaintChild(firstChild, 0)) {
-      navButtonParentData.shouldPaint = true;
-      if (overflowOpen) {
-        navButtonParentData.offset =
-            isAbove ? Offset(0.0, overflowHeight) : Offset.zero;
-        nextSize = Size(
-          nextSize.width,
-          isAbove ? nextSize.height + navButton.size.height : nextSize.height,
-        );
-      } else {
-        navButtonParentData.offset = Offset(fitWidth, 0.0);
-        nextSize = Size(nextSize.width + navButton.size.width, nextSize.height);
-      }
-    } else {
-      navButtonParentData.shouldPaint = false;
-    }
+
+    navButtonParentData.shouldPaint = false;
 
     size = nextSize;
   }
@@ -631,61 +601,19 @@ class _TextSelectionToolbarLayout extends SingleChildLayoutDelegate {
   }
 }
 
-
-class MaterialTextSelectionToolbarItemBuilder
-    extends ContextMenuItemBuilder {
-  final bool isFirst;
-  final bool isLast;
-
-  MaterialTextSelectionToolbarItemBuilder(
-      {this.isFirst = false, this.isLast = false});
-
-  @override
-  Widget buildItem(BuildContext context, ContextMenuItem item) {
-    return ButtonTheme.fromButtonThemeData(
-      data: ButtonTheme.of(context).copyWith(
-        height: kMinInteractiveDimension,
-        minWidth: kMinInteractiveDimension,
-      ),
-      child: FlatButton(
-        onPressed: item.onPressed != null
-            ? () {
-                final controller = DefaultMenuContextController.of(context);
-                if (item.children == null) controller.hide();
-                item.onPressed(controller);
-              }
-            : null,
-        padding: EdgeInsets.only(
-          // These values were eyeballed to match the native text selection menu
-          // on a Pixel 2 running Android 10.
-          left: 9.5 + (isFirst ? 5.0 : 0.0),
-          right: 9.5 + (isLast ? 5.0 : 0.0),
-        ),
-        shape: Border.all(width: 0.0, color: Colors.transparent),
-        child: item.title,
-      ),
-    );
-  }
-}
-
-
-class MaterialSelectionToolbar extends ContextMenu {
+class CupertinoPullDownMenu extends ContextMenu {
   final List<ContextMenuItem> actions;
 
   final Color backgroundColor;
   final double elevation;
 
-  final Clip clipBehavior;
-  final ShapeBorder shape;
-  final ThemeData theme;
+  final double width;
 
-  MaterialSelectionToolbar({
+  CupertinoPullDownMenu({
     @required this.actions,
     this.backgroundColor,
     this.elevation,
-    this.clipBehavior,
-    this.shape,
-    this.theme,
+    this.width = _kToolbarDefaultWidth,
   })  : assert(actions != null),
         super(actions: actions);
 
@@ -697,7 +625,6 @@ class MaterialSelectionToolbar extends ContextMenu {
     double textLineHeight,
     Offset selectionMidpoint,
     List<TextSelectionPoint> endpoints,
-    
   ) {
     assert(debugCheckHasMediaQuery(context));
     assert(debugCheckHasMaterialLocalizations(context));
@@ -707,9 +634,9 @@ class MaterialSelectionToolbar extends ContextMenu {
     // space above the TextField to show it.
 
     final toolbarScreenPadding = _kToolbarScreenPadding;
-    final toolbarHeight = _kToolbarHeight;
+    final toolbarHeight = 400; // Not valid
     final toolbarContentDistance = _kToolbarContentDistance;
-    final toolbarContentDistanceBelow = _kToolbarContentDistanceBelow;
+    final toolbarContentDistanceBelow = _kToolbarContentDistance;
 
     final Offset startTextSelectionPoint = endpoints.first.point;
     final Offset endTextSelectionPoint = endpoints.last.point;
@@ -735,7 +662,7 @@ class MaterialSelectionToolbar extends ContextMenu {
               toolbarContentDistanceBelow,
     );
 
-    final child = Stack(
+    return Stack(
       children: <Widget>[
         CustomSingleChildLayout(
           delegate: _TextSelectionToolbarLayout(
@@ -743,48 +670,19 @@ class MaterialSelectionToolbar extends ContextMenu {
             toolbarScreenPadding + mediaQuery.padding.top,
             fitsAbove,
           ),
-          child: _ContextMenu(
-            items: actions,
-            isAbove: fitsAbove,
-            shape: shape,
-            backgroundColor: backgroundColor,
-            elevation: elevation,
-            clipBehavior: clipBehavior,
-          ),
+          child: buildContextMenu(context, isAbove: fitsAbove),
         )
       ],
     );
-
-    if (theme != null) {
-      return Theme(data: theme, child: child);
-    } else {
-      return child;
-    }
   }
 
-   @override
-  Widget buildContextMenu(
-    BuildContext context,
-  ) {
-    
-    final child = Stack(
-      children: <Widget>[
-         _ContextMenu(
-            items: actions,
-            isAbove: true,
-            shape: shape,
-            backgroundColor: backgroundColor,
-            elevation: elevation,
-            clipBehavior: clipBehavior,
-          ),
-        
-      ],
+  @override
+  Widget buildContextMenu(BuildContext context, {bool isAbove = true}) {
+    return _CupertinoPullDownContainer(
+      items: actions,
+      isAbove: isAbove,
+      width: width,
+      controller: DefaultMenuContextController.of(context),
     );
-
-    if (theme != null) {
-      return Theme(data: theme, child: child);
-    } else {
-      return child;
-    }
   }
 }
